@@ -57,7 +57,7 @@ func TestAuthenticatedConfirmationFlowAgainstComposeStack(t *testing.T) {
 	placeID := page.Items[0].ID
 
 	headers := map[string]string{
-		"Authorization":     "Bearer " + tokens.AccessToken,
+		"Authorization":   "Bearer " + tokens.AccessToken,
 		"Idempotency-Key": "compose-auth-confirmation-key",
 	}
 	confirmation := map[string]any{"kind": "exists", "result": "confirmed"}
@@ -70,7 +70,7 @@ func TestAuthenticatedConfirmationFlowAgainstComposeStack(t *testing.T) {
 	postJSON(t, client, baseURL+"/api/v1/places/"+placeID+"/confirmations", map[string]any{"kind": "exists", "result": "incorrect"}, headers, http.StatusConflict)
 	postJSON(t, client, baseURL+"/api/v1/auth/logout", map[string]any{"refreshToken": tokens.RefreshToken}, nil, http.StatusNoContent)
 	postJSON(t, client, baseURL+"/api/v1/places/"+placeID+"/confirmations", confirmation, map[string]string{
-		"Authorization":     "Bearer " + tokens.AccessToken,
+		"Authorization":   "Bearer " + tokens.AccessToken,
 		"Idempotency-Key": "compose-auth-revoked-key",
 	}, http.StatusUnauthorized)
 }

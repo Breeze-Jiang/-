@@ -50,7 +50,7 @@ func Load() (Config, error) {
 		AdminAddr:              env("ADMIN_ADDR", "127.0.0.1:9090"),
 		RideHailingURLTemplate: os.Getenv("RIDE_HAILING_URL_TEMPLATE"),
 		AliyunAccessKeyID:      os.Getenv("ALIYUN_ACCESS_KEY_ID"), AliyunAccessKeySecret: os.Getenv("ALIYUN_ACCESS_KEY_SECRET"), AliyunSMSSignName: os.Getenv("ALIYUN_SMS_SIGN_NAME"), AliyunSMSTemplateCode: os.Getenv("ALIYUN_SMS_TEMPLATE_CODE"),
-		TestSMSCode:            os.Getenv("TEST_SMS_CODE"),
+		TestSMSCode: os.Getenv("TEST_SMS_CODE"),
 	}
 	var missing []string
 	for k, v := range map[string]string{"DATABASE_URL": c.DatabaseURL, "REDIS_URL": c.RedisURL, "JWT_SECRET": c.JWTSecret, "CURSOR_SECRET": c.CursorSecret, "AMAP_WEB_SERVICE_KEY": c.AmapKey} {
