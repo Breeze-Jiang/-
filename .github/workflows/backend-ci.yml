@@ -105,7 +105,7 @@ jobs:
           exit 1
       - name: Verify migrations and extensions
         run: |
-          test "$(docker compose ps -q migrate | xargs -r docker inspect -f '{{.State.ExitCode}}')" = 0
+          test "$(docker compose ps -aq migrate | xargs -r docker inspect -f '{{.State.ExitCode}}')" = 0
           docker compose exec -T postgres psql -U alongtu -d alongtu -c "SELECT version_id, is_applied FROM goose_db_version ORDER BY id;"
           docker compose exec -T postgres psql -U alongtu -d alongtu -c "SELECT extname FROM pg_extension WHERE extname IN ('postgis','pgcrypto') ORDER BY extname;"
       - name: Verify health endpoints
