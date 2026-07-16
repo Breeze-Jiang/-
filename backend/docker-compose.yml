@@ -1,0 +1,54 @@
+services:
+  api:
+    build: .
+    env_file: [.env]
+    environment:
+      DATABASE_URL: postgres://alongtu:alongtu@postgres:5432/alongtu?sslmode=disable
+      REDIS_URL: redis://redis:6379/0
+      AMAP_BASE_URL: http://fake-provider:8090
+      ADMIN_ADDR: 0.0.0.0:9090
+    ports: ["8080:8080"]
+    expose: ["9090"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+      fake-provider: { condition: service_started }
+  migrate:
+    build:
+      context: .
+      target: migrate
+    command: ["-dir", "/migrations", "postgres", "postgres://alongtu:alongtu@postgres:5432/alongtu?sslmode=disable", "up"]
+    volumes: ["./db/migrations:/migrations:ro"]
+    depends_on:
+      postgres: { condition: service_healthy }
+  fake-provider:
+    image: python:3.12-alpine
+    command: ["python", "/app/server.py"]
+    volumes: ["./test/fake-provider/server.py:/app/server.py:ro"]
+    expose: ["8090"]
+  postgres:
+    image: postgis/postgis:17-3.5
+    environment:
+      POSTGRES_DB: alongtu
+      POSTGRES_USER: alongtu
+      POSTGRES_PASSWORD: alongtu
+    ports: ["5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U alongtu"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes: ["postgres_data:/var/lib/postgresql/data"]
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes: ["redis_data:/data"]
+volumes:
+  postgres_data:
+  redis_data:

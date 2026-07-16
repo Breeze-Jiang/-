@@ -1,0 +1,352 @@
+openapi: 3.0.3
+info: { title: Alongtu P0 API, version: 0.1.0 }
+servers: [{ url: /api/v1 }]
+paths:
+  /auth/sms/send:
+    post:
+      operationId: sendSmsCode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, deviceId]
+              additionalProperties: false
+              properties: { phone: { type: string }, deviceId: { type: string, minLength: 8, maxLength: 200 } }
+      responses:
+        '202': { description: Accepted, content: { application/json: { schema: { $ref: '#/components/schemas/ChallengeEnvelope' } } } }
+        '400': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /auth/sms/verify:
+    post:
+      operationId: verifySmsCode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [challengeId, code, deviceId]
+              additionalProperties: false
+              properties: { challengeId: { type: string, format: uuid }, code: { type: string, pattern: '^[0-9]{6}$' }, deviceId: { type: string } }
+      responses:
+        '200': { description: Tokens, content: { application/json: { schema: { $ref: '#/components/schemas/TokensEnvelope' } } } }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '500': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /auth/refresh:
+    post:
+      operationId: refreshSession
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [refreshToken], additionalProperties: false, properties: { refreshToken: { type: string } } } } } }
+      responses:
+        '200': { description: Rotated tokens, content: { application/json: { schema: { $ref: '#/components/schemas/TokensEnvelope' } } } }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '500': { $ref: '#/components/responses/Error' }
+  /auth/logout:
+    post:
+      operationId: logoutSession
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [refreshToken], additionalProperties: false, properties: { refreshToken: { type: string } } } } } }
+      responses:
+        '204': { description: Logged out }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '500': { $ref: '#/components/responses/Error' }
+  /places/nearby:
+    get:
+      operationId: nearbyPlaces
+      parameters:
+        - { in: query, name: latitude, required: true, schema: { type: number, minimum: -90, maximum: 90 } }
+        - { in: query, name: longitude, required: true, schema: { type: number, minimum: -180, maximum: 180 } }
+        - { in: query, name: coordinateSystem, required: true, schema: { $ref: '#/components/schemas/CoordinateSystem' } }
+        - { in: query, name: category, schema: { type: string } }
+        - { in: query, name: radiusMeters, schema: { type: integer, minimum: 100, maximum: 50000 } }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 50 } }
+        - { in: query, name: cursor, schema: { type: string } }
+      responses:
+        '200': { description: Places, content: { application/json: { schema: { $ref: '#/components/schemas/PlacePageEnvelope' } } } }
+        '400': { $ref: '#/components/responses/Error' }
+        '500': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
+  /places/search:
+    get:
+      operationId: searchPlaces
+      parameters:
+        - { in: query, name: q, required: true, schema: { type: string, minLength: 1, maxLength: 80 } }
+        - { in: query, name: cityCode, schema: { type: string } }
+        - { in: query, name: category, schema: { $ref: '#/components/schemas/PlaceCategory' } }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 50 } }
+        - { in: query, name: cursor, schema: { type: string } }
+      responses:
+        '200': { description: Places, content: { application/json: { schema: { $ref: '#/components/schemas/PlacePageEnvelope' } } } }
+        '400': { $ref: '#/components/responses/Error' }
+        '500': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
+  /places/{placeId}:
+    get:
+      operationId: getPlace
+      parameters: [{ in: path, name: placeId, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: Place, content: { application/json: { schema: { $ref: '#/components/schemas/PlaceEnvelope' } } } }
+        '404': { $ref: '#/components/responses/Error' }
+        '500': { $ref: '#/components/responses/Error' }
+  /places/{placeId}/confirmations:
+    post:
+      operationId: confirmPlace
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: placeId, required: true, schema: { type: string, format: uuid } }
+        - { in: header, name: Idempotency-Key, required: true, schema: { type: string, minLength: 8, maxLength: 200 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConfirmationRequest' }
+      responses:
+        '201': { description: Confirmation, content: { application/json: { schema: { $ref: '#/components/schemas/ConfirmationEnvelope' } } } }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+        '500': { $ref: '#/components/responses/Error' }
+  /places/{placeId}/feedback:
+    post:
+      operationId: submitPlaceFeedback
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { in: path, name: placeId, required: true, schema: { type: string, format: uuid } }
+        - { in: header, name: Idempotency-Key, required: true, schema: { type: string, minLength: 8, maxLength: 200 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FeedbackRequest' }
+      responses:
+        '201': { description: Accepted fact feedback, not a public trust-field update, content: { application/json: { schema: { $ref: '#/components/schemas/FeedbackEnvelope' } } } }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+        '500': { $ref: '#/components/responses/Error' }
+  /navigation/external-links:
+    get:
+      operationId: navigationExternalLinks
+      parameters:
+        - { in: query, name: originLatitude, required: true, schema: { type: number } }
+        - { in: query, name: originLongitude, required: true, schema: { type: number } }
+        - { in: query, name: destinationLatitude, required: true, schema: { type: number } }
+        - { in: query, name: destinationLongitude, required: true, schema: { type: number } }
+        - { in: query, name: destinationName, required: true, schema: { type: string, minLength: 1, maxLength: 200 } }
+        - { in: query, name: coordinateSystem, required: true, schema: { $ref: '#/components/schemas/CoordinateSystem' } }
+        - { in: query, name: mode, required: true, schema: { type: string, enum: [walking, cycling, driving, transit, taxi] } }
+      responses:
+        '200': { description: External links, content: { application/json: { schema: { $ref: '#/components/schemas/ExternalLinksEnvelope' } } } }
+        '400': { $ref: '#/components/responses/Error' }
+  /navigation/routes:
+    post:
+      operationId: createRoute
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RouteRequest' }
+      responses:
+        '200': { description: Provider-independent route, content: { application/json: { schema: { $ref: '#/components/schemas/RouteEnvelope' } } } }
+        '400': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  schemas:
+    CoordinateSystem: { type: string, enum: [wgs84, gcj02] }
+    PlaceCategory:
+      type: string
+      enum: [unclassified, toilet, fuel, charging, supermarket, attraction, hotel, parking, power_bank, pharmacy, hospital, convenience_store, police, food]
+    Coordinate:
+      type: object
+      required: [latitude, longitude, coordinateSystem]
+      properties:
+        latitude: { type: number, minimum: -90, maximum: 90 }
+        longitude: { type: number, minimum: -180, maximum: 180 }
+        coordinateSystem: { $ref: '#/components/schemas/CoordinateSystem' }
+    RouteRequest:
+      type: object
+      required: [origin, destination, mode]
+      additionalProperties: false
+      properties:
+        origin: { $ref: '#/components/schemas/Coordinate' }
+        destination: { $ref: '#/components/schemas/Coordinate' }
+        mode: { type: string, enum: [walking, cycling, driving, transit, taxi] }
+        originCity: { type: string }
+        destinationCity: { type: string }
+    Challenge:
+      type: object
+      required: [challengeId, expiresIn]
+      properties:
+        challengeId: { type: string, format: uuid }
+        expiresIn: { type: string, example: 5m }
+    Tokens:
+      type: object
+      required: [accessToken, refreshToken, accessExpiresAt, refreshExpiresAt]
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
+        accessExpiresAt: { type: string, format: date-time }
+        refreshExpiresAt: { type: string, format: date-time }
+    TrustItem:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [unknown, confirmed, incorrect] }
+        confirmedAt: { type: string, format: date-time }
+        source: { type: string }
+    TrustSummary:
+      type: object
+      required: [exists, openingHours]
+      properties:
+        exists: { $ref: '#/components/schemas/TrustItem' }
+        openingHours: { $ref: '#/components/schemas/TrustItem' }
+    Place:
+      type: object
+      required: [id, name, category, location, trust]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        category: { $ref: '#/components/schemas/PlaceCategory' }
+        address: { type: string }
+        cityCode: { type: string }
+        districtCode: { type: string }
+        location: { $ref: '#/components/schemas/Coordinate' }
+        distanceMeters: { type: number, minimum: 0 }
+        trust: { $ref: '#/components/schemas/TrustSummary' }
+        sourceUpdatedAt: { type: string, format: date-time }
+    PlacePage:
+      type: object
+      required: [items, degraded, dataFreshness, coverage]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Place' } }
+        nextCursor: { type: string }
+        degraded: { type: boolean }
+        dataFreshness: { type: string, enum: [live, stored, cached, degraded] }
+        coverage: { type: string, enum: [covered, not_covered] }
+    ConfirmationRequest:
+      type: object
+      required: [kind, result]
+      additionalProperties: false
+      properties:
+        kind: { type: string, enum: [exists, opening_hours] }
+        result: { type: string, enum: [confirmed, incorrect, unknown] }
+    Confirmation:
+      type: object
+      required: [id, placeId, kind, result, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        placeId: { type: string, format: uuid }
+        kind: { type: string, enum: [exists, opening_hours] }
+        result: { type: string, enum: [confirmed, incorrect, unknown] }
+        createdAt: { type: string, format: date-time }
+    FeedbackRequest:
+      type: object
+      required: [kind, details]
+      additionalProperties: false
+      properties:
+        kind: { type: string, enum: [entrance, incorrect_info] }
+        details: { type: string, minLength: 1, maxLength: 500 }
+    Feedback:
+      type: object
+      required: [id, placeId, kind, details, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        placeId: { type: string, format: uuid }
+        kind: { type: string, enum: [entrance, incorrect_info] }
+        details: { type: string }
+        createdAt: { type: string, format: date-time }
+    ExternalLink:
+      type: object
+      required: [provider, available]
+      properties:
+        provider: { type: string, enum: [amap, baidu, tencent, ride_hailing] }
+        uri: { type: string }
+        available: { type: boolean }
+    RouteStep:
+      type: object
+      required: [instruction, distanceMeters]
+      properties:
+        instruction: { type: string }
+        distanceMeters: { type: integer, minimum: 0 }
+        durationSeconds: { type: integer, minimum: 0 }
+        polyline: { type: array, items: { $ref: '#/components/schemas/Coordinate' } }
+    RouteTransfer:
+      type: object
+      required: [lineName, departureStop, arrivalStop]
+      properties:
+        lineName: { type: string }
+        departureStop: { type: string }
+        arrivalStop: { type: string }
+    Route:
+      type: object
+      required: [distanceMeters, durationSeconds, polyline, steps, dataFreshness, externalFallback]
+      properties:
+        distanceMeters: { type: integer, minimum: 0 }
+        durationSeconds: { type: integer, minimum: 0 }
+        polyline: { type: array, items: { $ref: '#/components/schemas/Coordinate' } }
+        steps: { type: array, items: { $ref: '#/components/schemas/RouteStep' } }
+        transfers: { type: array, items: { $ref: '#/components/schemas/RouteTransfer' } }
+        providerUpdatedAt: { type: string, format: date-time }
+        dataFreshness: { type: string, enum: [live, cached, external_only] }
+        externalFallback: { type: array, items: { $ref: '#/components/schemas/ExternalLink' } }
+    Error:
+      type: object
+      required: [code, message, requestId]
+      properties: { code: { type: string }, message: { type: string }, details: {}, requestId: { type: string } }
+    ChallengeEnvelope:
+      type: object
+      required: [data]
+      properties: { data: { $ref: '#/components/schemas/Challenge' } }
+    TokensEnvelope:
+      type: object
+      required: [data]
+      properties: { data: { $ref: '#/components/schemas/Tokens' } }
+    PlaceEnvelope:
+      type: object
+      required: [data]
+      properties: { data: { $ref: '#/components/schemas/Place' } }
+    PlacePageEnvelope:
+      type: object
+      required: [data]
+      properties: { data: { $ref: '#/components/schemas/PlacePage' } }
+    ConfirmationEnvelope:
+      type: object
+      required: [data]
+      properties: { data: { $ref: '#/components/schemas/Confirmation' } }
+    FeedbackEnvelope:
+      type: object
+      required: [data]
+      properties: { data: { $ref: '#/components/schemas/Feedback' } }
+    ExternalLinksData:
+      type: object
+      required: [links]
+      properties: { links: { type: array, items: { $ref: '#/components/schemas/ExternalLink' } } }
+    ExternalLinksEnvelope:
+      type: object
+      required: [data]
+      properties: { data: { $ref: '#/components/schemas/ExternalLinksData' } }
+    RouteEnvelope:
+      type: object
+      required: [data]
+      properties: { data: { $ref: '#/components/schemas/Route' } }
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties: { error: { $ref: '#/components/schemas/Error' } }
+  responses:
+    Error:
+      description: Error envelope
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }

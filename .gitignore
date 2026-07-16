@@ -1,0 +1,38 @@
+# Environment files and secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# JavaScript dependencies and build output
+node_modules/
+**/node_modules/
+build/
+**/build/
+dist/
+**/dist/
+
+# React Native / Android generated files
+android/build/
+**/android/build/
+android/app/build/
+**/android/app/build/
+.gradle/
+**/.gradle/
+.idea/
+**/.idea/
+*.iml
+
+# React Native / iOS generated dependencies
+Pods/
+**/Pods/
+
+# Local toolchains and dependency caches used only for verification
+/.cache/
+/.go-toolchain/
+/.go-toolchain.zip
+/.tmp-go.zip
+backend/.cache/
+
+# Local Windows binaries
+*.exe

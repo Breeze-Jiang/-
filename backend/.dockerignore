@@ -1,0 +1,11 @@
+.env*
+.cache/
+.git/
+*.test
+*.test.exe
+*.exe
+*.key
+*.pem
+*.p12
+*.pfx
+coverage.out

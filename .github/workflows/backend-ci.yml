@@ -1,0 +1,172 @@
+name: Backend Linux CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - backend/**
+      - .github/workflows/backend-ci.yml
+      - .gitignore
+  pull_request:
+    branches: [main]
+    paths:
+      - backend/**
+      - .github/workflows/backend-ci.yml
+      - .gitignore
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      GOTOOLCHAIN: local
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.5'
+          cache-dependency-path: backend/go.sum
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check formatting
+        run: test -z "$(gofmt -l .)"
+      - name: Verify sqlc output
+        run: |
+          GOBIN="$RUNNER_TEMP/bin" go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.29.0
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/bin/sqlc" generate
+          git diff --exit-code -- internal/platform/database/dbgen
+      - name: Run unit tests
+        run: go test ./...
+      - name: Run race tests
+        run: go test -race ./...
+      - name: Vet
+        run: go vet ./...
+      - name: Lint OpenAPI
+        run: |
+          npm install --global @stoplight/spectral-cli@6.15.0
+          spectral lint api/openapi.yaml
+      - name: Build API image
+        run: docker build --tag alongtu-api-ci .
+
+  compose-e2e:
+    needs: quality
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create CI-only environment
+        run: |
+          python3 - <<'PY'
+          import secrets
+          from pathlib import Path
+
+          Path('.env').write_text('\n'.join([
+              'APP_ENV=development',
+              'HTTP_ADDR=:8080',
+              'DATABASE_URL=postgres://alongtu:alongtu@postgres:5432/alongtu?sslmode=disable',
+              'REDIS_URL=redis://redis:6379/0',
+              f'JWT_SECRET={secrets.token_urlsafe(48)}',
+              f'CURSOR_SECRET={secrets.token_urlsafe(48)}',
+              'ACCESS_TOKEN_TTL=15m',
+              'REFRESH_TOKEN_TTL=720h',
+              'CORS_ALLOWED_ORIGINS=http://localhost:3000',
+              'AMAP_WEB_SERVICE_KEY=ci-fake-amap-key',
+              'AMAP_BASE_URL=http://fake-provider:8090',
+              'PROVIDER_TIMEOUT=2200ms',
+              'TRUSTED_PROXY_CIDRS=127.0.0.1/32',
+              'ADMIN_ADDR=0.0.0.0:9090',
+              'RIDE_HAILING_URL_TEMPLATE=',
+              'ALIYUN_ACCESS_KEY_ID=',
+              'ALIYUN_ACCESS_KEY_SECRET=',
+              'ALIYUN_SMS_SIGN_NAME=',
+              'ALIYUN_SMS_TEMPLATE_CODE=',
+              '',
+          ]), encoding='utf-8')
+          PY
+      - name: Start Compose stack
+        run: docker compose up -d --build
+      - name: Wait for API readiness
+        run: |
+          for _ in {1..30}; do
+            if curl --fail --silent --show-error http://127.0.0.1:8080/health/ready >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          exit 1
+      - name: Verify migrations and extensions
+        run: |
+          test "$(docker compose ps -q migrate | xargs -r docker inspect -f '{{.State.ExitCode}}')" = 0
+          docker compose exec -T postgres psql -U alongtu -d alongtu -c "SELECT version_id, is_applied FROM goose_db_version ORDER BY id;"
+          docker compose exec -T postgres psql -U alongtu -d alongtu -c "SELECT extname FROM pg_extension WHERE extname IN ('postgis','pgcrypto') ORDER BY extname;"
+      - name: Verify health endpoints
+        run: |
+          curl --fail --silent --show-error http://127.0.0.1:8080/health/live >/dev/null
+          curl --fail --silent --show-error http://127.0.0.1:8080/health/ready >/dev/null
+      - name: Verify visitor place and navigation flow
+        run: |
+          python3 - <<'PY'
+          import json
+          from urllib.parse import urlencode
+          from urllib.request import Request, urlopen
+
+          base = 'http://127.0.0.1:8080/api/v1'
+
+          def get(path, params):
+              with urlopen(f'{base}{path}?{urlencode(params)}', timeout=10) as response:
+                  assert response.status == 200
+                  return json.load(response)
+
+          nearby = get('/places/nearby', {
+              'latitude': 39.908823,
+              'longitude': 116.397470,
+              'coordinateSystem': 'gcj02',
+              'category': 'toilet',
+              'radiusMeters': 5000,
+              'limit': 20,
+          })
+          place = nearby['data']['items'][0]
+          assert place['category'] == 'toilet'
+          with urlopen(f"{base}/places/{place['id']}", timeout=10) as response:
+              assert response.status == 200
+              detail = json.load(response)['data']
+          assert detail['trust']['exists']['status'] == 'unknown'
+          assert detail['trust']['openingHours']['status'] == 'unknown'
+          location = place['location']
+          route_body = json.dumps({
+              'origin': {'latitude': 39.908823, 'longitude': 116.397470, 'coordinateSystem': 'gcj02'},
+              'destination': location,
+              'mode': 'walking',
+          }).encode()
+          request = Request(f'{base}/navigation/routes', data=route_body, headers={'Content-Type': 'application/json'}, method='POST')
+          with urlopen(request, timeout=10) as response:
+              assert response.status == 200
+              route = json.load(response)['data']
+          assert route['distanceMeters'] > 0
+          assert route['durationSeconds'] > 0
+          links = get('/navigation/external-links', {
+              'originLatitude': 39.908823,
+              'originLongitude': 116.397470,
+              'destinationLatitude': location['latitude'],
+              'destinationLongitude': location['longitude'],
+              'destinationName': place['name'],
+              'coordinateSystem': 'gcj02',
+              'mode': 'walking',
+          })
+          assert len(links['data']['links']) == 3
+          PY
+      - name: Collect Compose diagnostics and clean up
+        if: always()
+        run: |
+          docker compose ps -a
+          docker compose logs --no-color
+          docker compose down -v
