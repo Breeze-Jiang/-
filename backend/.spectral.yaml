@@ -1,0 +1,39 @@
+rules:
+  openapi-version:
+    description: OpenAPI document must declare a supported 3.0 version.
+    given: $
+    then:
+      field: openapi
+      function: pattern
+      functionOptions:
+        match: '^3\.0\.[0-9]+$'
+  info-title:
+    description: API metadata must include a title.
+    given: $.info
+    then:
+      field: title
+      function: truthy
+  info-version:
+    description: API metadata must include a version.
+    given: $.info
+    then:
+      field: version
+      function: truthy
+  paths-present:
+    description: API document must declare paths.
+    given: $
+    then:
+      field: paths
+      function: truthy
+  operation-id:
+    description: Every HTTP operation must expose an operationId.
+    given: $.paths[*][get,post,put,patch,delete]
+    then:
+      field: operationId
+      function: truthy
+  operation-responses:
+    description: Every HTTP operation must declare responses.
+    given: $.paths[*][get,post,put,patch,delete]
+    then:
+      field: responses
+      function: truthy
