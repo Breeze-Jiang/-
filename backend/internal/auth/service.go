@@ -21,6 +21,10 @@ import (
 type Sender interface {
 	SendCode(context.Context, string, string) error
 }
+
+type fixedCodeSender interface {
+	fixedCode() string
+}
 type Metrics interface {
 	ObserveAuth(operation, outcome string)
 }
@@ -110,12 +114,11 @@ func (s *Service) Send(ctx context.Context, phone, deviceID, clientIP string) (s
 		s.observe("sms_send", "rate_limited")
 		return "", ErrRateLimited
 	}
-	raw := make([]byte, 4)
-	if _, err = rand.Read(raw); err != nil {
+	code, err := s.challengeCode()
+	if err != nil {
 		s.observe("sms_send", "internal_error")
 		return "", err
 	}
-	code := fmt.Sprintf("%06d", (int(raw[0])<<16|int(raw[1])<<8|int(raw[2]))%1000000)
 	id := uuid.NewString()
 	payload, _ := json.Marshal(challenge{Phone: phone, DeviceID: deviceID, CodeMAC: s.codeMAC(code)})
 	if err = s.redis.Set(ctx, "otp:challenge:"+id, payload, 5*time.Minute).Err(); err != nil {
@@ -129,6 +132,17 @@ func (s *Service) Send(ctx context.Context, phone, deviceID, clientIP string) (s
 	}
 	s.observe("sms_send", "success")
 	return id, nil
+}
+
+func (s *Service) challengeCode() (string, error) {
+	if sender, ok := s.sender.(fixedCodeSender); ok {
+		return sender.fixedCode(), nil
+	}
+	raw := make([]byte, 4)
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%06d", (int(raw[0])<<16|int(raw[1])<<8|int(raw[2]))%1000000), nil
 }
 
 func (s *Service) Verify(ctx context.Context, challengeID, code, deviceID string) (Tokens, error) {
