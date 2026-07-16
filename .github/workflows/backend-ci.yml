@@ -63,6 +63,10 @@ jobs:
         working-directory: backend
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.5'
+          cache-dependency-path: backend/go.sum
       - name: Create CI-only environment
         run: |
           python3 - <<'PY'
@@ -108,6 +112,10 @@ jobs:
           test "$(docker compose ps -aq migrate | xargs -r docker inspect -f '{{.State.ExitCode}}')" = 0
           docker compose exec -T postgres psql -U alongtu -d alongtu -c "SELECT version_id, is_applied FROM goose_db_version ORDER BY id;"
           docker compose exec -T postgres psql -U alongtu -d alongtu -c "SELECT extname FROM pg_extension WHERE extname IN ('postgis','pgcrypto') ORDER BY extname;"
+      - name: Run PostGIS repository integration tests
+        env:
+          INTEGRATION_DATABASE_URL: postgres://alongtu:alongtu@127.0.0.1:5432/alongtu?sslmode=disable
+        run: go test -count=1 -tags=integration ./test/integration
       - name: Verify health endpoints
         run: |
           curl --fail --silent --show-error http://127.0.0.1:8080/health/live >/dev/null
