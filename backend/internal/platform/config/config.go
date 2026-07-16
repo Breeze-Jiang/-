@@ -29,6 +29,7 @@ type Config struct {
 	AliyunAccessKeySecret  string
 	AliyunSMSSignName      string
 	AliyunSMSTemplateCode  string
+	TestSMSCode            string
 }
 
 func Load() (Config, error) {
@@ -49,6 +50,7 @@ func Load() (Config, error) {
 		AdminAddr:              env("ADMIN_ADDR", "127.0.0.1:9090"),
 		RideHailingURLTemplate: os.Getenv("RIDE_HAILING_URL_TEMPLATE"),
 		AliyunAccessKeyID:      os.Getenv("ALIYUN_ACCESS_KEY_ID"), AliyunAccessKeySecret: os.Getenv("ALIYUN_ACCESS_KEY_SECRET"), AliyunSMSSignName: os.Getenv("ALIYUN_SMS_SIGN_NAME"), AliyunSMSTemplateCode: os.Getenv("ALIYUN_SMS_TEMPLATE_CODE"),
+		TestSMSCode:            os.Getenv("TEST_SMS_CODE"),
 	}
 	var missing []string
 	for k, v := range map[string]string{"DATABASE_URL": c.DatabaseURL, "REDIS_URL": c.RedisURL, "JWT_SECRET": c.JWTSecret, "CURSOR_SECRET": c.CursorSecret, "AMAP_WEB_SERVICE_KEY": c.AmapKey} {
@@ -77,7 +79,25 @@ func Load() (Config, error) {
 	if c.Environment == "production" && (c.AliyunAccessKeyID == "" || c.AliyunAccessKeySecret == "" || c.AliyunSMSSignName == "" || c.AliyunSMSTemplateCode == "") {
 		return Config{}, errors.New("production requires complete Aliyun SMS configuration")
 	}
+	if c.Environment == "production" && c.TestSMSCode != "" {
+		return Config{}, errors.New("production must not set TEST_SMS_CODE")
+	}
+	if c.Environment == "test" && !sixDigitCode(c.TestSMSCode) {
+		return Config{}, errors.New("test requires a six-digit TEST_SMS_CODE")
+	}
 	return c, nil
+}
+
+func sixDigitCode(value string) bool {
+	if len(value) != 6 {
+		return false
+	}
+	for _, character := range value {
+		if character < '0' || character > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 func env(key, fallback string) string {
