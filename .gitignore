@@ -40,6 +40,7 @@ backend/.cache/
 # Local React Native bundles and provider credentials
 **/.tmp/
 place_app/android/amap.properties
+place_app/android/p0-api.properties
 place_app/android/local.properties
 **/debug.keystore
 **/hs_err_pid*.log

@@ -1,3 +1,4 @@
+import { NativeModules, Platform } from 'react-native';
 import type {
   Confirmation,
   Coordinate,
@@ -12,8 +13,17 @@ import type {
   Tokens,
 } from './contracts';
 
-const DEFAULT_API_ORIGIN = 'http://10.0.2.2:8080';
-let apiOrigin = DEFAULT_API_ORIGIN;
+type P0RuntimeConfig = { apiOrigin?: string };
+
+function defaultApiOrigin() {
+  const origin = (NativeModules.P0RuntimeConfig as P0RuntimeConfig | undefined)?.apiOrigin?.trim();
+  if (origin) return origin.replace(/\/$/, '');
+  // This development-only fallback works for the Android emulator. USB devices
+  // and every release must set P0_API_ORIGIN in the native build configuration.
+  return __DEV__ && Platform.OS === 'android' ? 'http://10.0.2.2:8080' : '';
+}
+
+let apiOrigin = defaultApiOrigin();
 
 export class P0ApiError extends Error {
   readonly status: number;
@@ -42,6 +52,9 @@ export function p0ApiOrigin() {
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  if (!apiOrigin) {
+    throw new P0ApiError(0, 'api_not_configured', '当前版本尚未配置服务地址，请联系测试或发布人员。');
+  }
   let response: Response;
   try {
     response = await fetch(`${apiOrigin}/api/v1${path}`, {

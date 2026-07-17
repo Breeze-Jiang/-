@@ -1,0 +1,3 @@
+# Copy to p0-api.properties (ignored by Git) to configure the API for a USB device.
+# Use HTTPS for a test or production server. This value is not a secret.
+P0_API_ORIGIN=https://api.example.com

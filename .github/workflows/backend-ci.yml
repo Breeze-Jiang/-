@@ -5,12 +5,14 @@ on:
     branches: [main]
     paths:
       - backend/**
+      - place_app/**
       - .github/workflows/backend-ci.yml
       - .gitignore
   pull_request:
     branches: [main]
     paths:
       - backend/**
+      - place_app/**
       - .github/workflows/backend-ci.yml
       - .gitignore
 
@@ -177,9 +179,39 @@ jobs:
         env:
           E2E_SMS_CODE: "123456"
         run: go test -count=1 -tags=e2e ./test/e2e
+      - name: Verify frontend authentication contract flow
+        env:
+          FRONTEND_E2E_BASE_URL: http://127.0.0.1:8080
+          E2E_SMS_CODE: "123456"
+        run: python3 test/frontend_e2e/verify.py
       - name: Collect Compose diagnostics and clean up
         if: always()
         run: |
           docker compose ps -a
           docker compose logs --no-color
           docker compose down -v
+
+  mobile-contract:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: place_app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: place_app/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install locked JavaScript dependencies
+        run: npm ci
+      - name: Verify P0 client types and routes
+        run: npm test
+      - name: Build Android debug APK
+        run: |
+          chmod +x android/gradlew
+          ./android/gradlew :app:assembleDebug

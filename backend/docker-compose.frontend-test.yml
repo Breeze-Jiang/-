@@ -1,0 +1,20 @@
+services:
+  api:
+    # Do not inherit backend/.env: it may contain real provider credentials.
+    env_file: !reset []
+    environment:
+      APP_ENV: test
+      TEST_SMS_CODE: "123456"
+      JWT_SECRET: frontend-e2e-jwt-secret-not-for-production
+      CURSOR_SECRET: frontend-e2e-cursor-secret-not-for-production
+      AMAP_WEB_SERVICE_KEY: frontend-e2e-fake-amap-key
+      CORS_ALLOWED_ORIGINS: http://localhost:3000
+      ALIYUN_ACCESS_KEY_ID: ""
+      ALIYUN_ACCESS_KEY_SECRET: ""
+      ALIYUN_SMS_SIGN_NAME: ""
+      ALIYUN_SMS_TEMPLATE_CODE: ""
+    ports: !override ["18080:8080"]
+  postgres:
+    ports: !override ["15432:5432"]
+  redis:
+    ports: !override ["16379:6379"]

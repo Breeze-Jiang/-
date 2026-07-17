@@ -80,6 +80,14 @@ if (amapPropertiesFile.exists()) {
 def amapKey = amapProperties.getProperty('AMAP_KEY') ?: System.getenv('AMAP_KEY') ?: ''
 def escapedAmapKey = amapKey.replace('\\', '\\\\').replace('"', '\\"')
 
+def p0ApiProperties = new Properties()
+def p0ApiPropertiesFile = rootProject.file('p0-api.properties')
+if (p0ApiPropertiesFile.exists()) {
+    p0ApiPropertiesFile.withInputStream { p0ApiProperties.load(it) }
+}
+def p0ApiOrigin = p0ApiProperties.getProperty('P0_API_ORIGIN') ?: project.findProperty('P0_API_ORIGIN') ?: System.getenv('P0_API_ORIGIN') ?: ''
+def escapedP0ApiOrigin = p0ApiOrigin.replace('\\', '\\\\').replace('"', '\\"')
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -89,6 +97,7 @@ android {
     defaultConfig {
         applicationId "com.placenative"
         buildConfigField "String", "AMAP_KEY", "\"${escapedAmapKey}\""
+        buildConfigField "String", "P0_API_ORIGIN", "\"${escapedP0ApiOrigin}\""
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
@@ -105,6 +114,9 @@ android {
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
+            if (p0ApiOrigin.isEmpty()) {
+                buildConfigField "String", "P0_API_ORIGIN", '"http://10.0.2.2:8080"'
+            }
         }
         release {
             // Caution! In production, you need to generate your own keystore file.

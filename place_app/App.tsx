@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { PermissionsAndroid, Platform, StatusBar } from 'react-native';
 import RootNavigator from './src/navigation/RootNavigator';
 import { useLocationPermissionStore } from './src/store/useLocationPermissionStore';
+import { useP0SessionStore } from './src/p0/session';
 
 export default function App() {
   useEffect(() => {
@@ -18,6 +19,9 @@ export default function App() {
       }
     };
     void requestLocation();
+  }, []);
+  useEffect(() => {
+    void useP0SessionStore.getState().bootstrap();
   }, []);
 
   return (
