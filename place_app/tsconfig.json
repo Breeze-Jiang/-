@@ -1,0 +1,43 @@
+{
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "commonjs",
+    "lib": ["es2021"],
+    "allowJs": true,
+    "jsx": "react-native",
+    "noEmit": true,
+    "isolatedModules": true,
+    "strict": true,
+    "moduleResolution": "node",
+    "baseUrl": ".",
+    "paths": {
+      "@shared/*": ["src/shared/*"],
+      "@modules/*": ["src/modules/*"],
+      "@store/*": ["src/store/*"],
+      "@api/*": ["src/api/*"],
+      "@p0/*": ["src/p0/*"],
+      "@navigation/*": ["src/navigation/*"]
+    },
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true
+  },
+  "include": [
+    "App.tsx",
+    "src/navigation/**/*.ts",
+    "src/navigation/**/*.tsx",
+    "src/app/**/*.ts",
+    "src/app/**/*.tsx",
+    "src/shared/components/**/*.ts",
+    "src/shared/components/**/*.tsx",
+    "src/shared/utils/theme.ts",
+    "src/shared/types/poi.ts",
+    "src/store/usePresentationSessionStore.ts",
+    "src/store/useLocationPermissionStore.ts",
+    "src/app/screens/AuthenticationScreen.tsx",
+    "src/p0/**/*.ts",
+    "src/p0/**/*.tsx"
+  ],
+  "exclude": ["node_modules", "babel.config.js", "metro.config.js", "src/modules", "src/store/useAuthStore.ts"]
+}

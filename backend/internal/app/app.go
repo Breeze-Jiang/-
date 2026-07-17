@@ -63,6 +63,13 @@ func New(ctx context.Context, c config.Config, log *slog.Logger) (*App, error) {
 	var sender auth.Sender = auth.DisabledSender{}
 	if c.Environment == "development" {
 		sender = auth.NewDevelopmentSender(log)
+	} else if c.Environment == "test" {
+		sender, err = auth.NewFixedTestSender(c.TestSMSCode)
+		if err != nil {
+			db.Close()
+			_ = rc.Close()
+			return nil, err
+		}
 	} else if c.Environment == "production" {
 		sender, err = auth.NewAliyunSender(c.AliyunAccessKeyID, c.AliyunAccessKeySecret, c.AliyunSMSSignName, c.AliyunSMSTemplateCode)
 		if err != nil {

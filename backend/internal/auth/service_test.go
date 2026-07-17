@@ -33,6 +33,21 @@ func TestValidateCode(t *testing.T) {
 	}
 }
 
+func TestFixedTestSenderAcceptsDeliveryWithoutLoggingSensitiveValues(t *testing.T) {
+	sender, err := NewFixedTestSender("123456")
+	if err != nil {
+		t.Fatalf("create fixed test sender: %v", err)
+	}
+	service := NewService(nil, nil, sender, "test-secret", time.Minute, time.Hour)
+	code, err := service.challengeCode()
+	if err != nil || code != "123456" {
+		t.Fatalf("fixed test sender did not supply its configured code: code=%q err=%v", code, err)
+	}
+	if err = sender.SendCode(context.Background(), "+8613800138000", "123456"); err != nil {
+		t.Fatalf("fixed test sender delivery failed: %v", err)
+	}
+}
+
 func TestInvalidSMSSendRecordsBoundedMetric(t *testing.T) {
 	metrics := &authMetricRecorder{}
 	service := NewService(nil, nil, DisabledSender{}, "test-secret", time.Minute, time.Hour, metrics)

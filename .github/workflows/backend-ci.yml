@@ -5,12 +5,14 @@ on:
     branches: [main]
     paths:
       - backend/**
+      - place_app/**
       - .github/workflows/backend-ci.yml
       - .gitignore
   pull_request:
     branches: [main]
     paths:
       - backend/**
+      - place_app/**
       - .github/workflows/backend-ci.yml
       - .gitignore
 
@@ -63,6 +65,10 @@ jobs:
         working-directory: backend
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.5'
+          cache-dependency-path: backend/go.sum
       - name: Create CI-only environment
         run: |
           python3 - <<'PY'
@@ -70,7 +76,8 @@ jobs:
           from pathlib import Path
 
           Path('.env').write_text('\n'.join([
-              'APP_ENV=development',
+              'APP_ENV=test',
+              'TEST_SMS_CODE=123456',
               'HTTP_ADDR=:8080',
               'DATABASE_URL=postgres://alongtu:alongtu@postgres:5432/alongtu?sslmode=disable',
               'REDIS_URL=redis://redis:6379/0',
@@ -108,6 +115,10 @@ jobs:
           test "$(docker compose ps -aq migrate | xargs -r docker inspect -f '{{.State.ExitCode}}')" = 0
           docker compose exec -T postgres psql -U alongtu -d alongtu -c "SELECT version_id, is_applied FROM goose_db_version ORDER BY id;"
           docker compose exec -T postgres psql -U alongtu -d alongtu -c "SELECT extname FROM pg_extension WHERE extname IN ('postgis','pgcrypto') ORDER BY extname;"
+      - name: Run PostGIS repository integration tests
+        env:
+          INTEGRATION_DATABASE_URL: postgres://alongtu:alongtu@127.0.0.1:5432/alongtu?sslmode=disable
+        run: go test -count=1 -tags=integration ./test/integration
       - name: Verify health endpoints
         run: |
           curl --fail --silent --show-error http://127.0.0.1:8080/health/live >/dev/null
@@ -164,9 +175,51 @@ jobs:
           })
           assert len(links['data']['links']) == 3
           PY
+      - name: Verify authenticated confirmation flow
+        env:
+          E2E_SMS_CODE: "123456"
+        run: go test -count=1 -tags=e2e ./test/e2e
+      - name: Verify frontend authentication contract flow
+        env:
+          FRONTEND_E2E_BASE_URL: http://127.0.0.1:8080
+          E2E_SMS_CODE: "123456"
+        run: python3 test/frontend_e2e/verify.py
       - name: Collect Compose diagnostics and clean up
         if: always()
         run: |
           docker compose ps -a
           docker compose logs --no-color
           docker compose down -v
+
+  mobile-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: place_app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: place_app/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install locked JavaScript dependencies
+        run: npm ci
+      - name: Verify P0 client types and routes
+        run: npm test
+      - name: Build Android debug APK
+        run: |
+          cd android
+          # Keep the China mirror for local Windows development, but GitHub's
+          # Linux runners use the official distribution endpoint.
+          sed -i 's|https://mirrors.aliyun.com/macports/distfiles/gradle/gradle-8.12-bin.zip|https://services.gradle.org/distributions/gradle-8.12-bin.zip|' gradle/wrapper/gradle-wrapper.properties
+          chmod +x gradlew
+          if [ ! -f app/debug.keystore ]; then
+            keytool -genkeypair -keystore app/debug.keystore -storepass android -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US" -noprompt
+          fi
+          ./gradlew :app:assembleDebug -PreactNativeArchitectures=x86_64 --no-daemon

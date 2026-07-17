@@ -217,7 +217,7 @@ func testConfirmationIdempotency(t *testing.T, pool *pgxpool.Pool) {
 	}
 	assertSingleValue(t, ids)
 	conflict := request
-	conflict.Result = "rejected"
+	conflict.Result = "incorrect"
 	if _, err = repo.AddConfirmation(ctx, conflict); !errors.Is(err, places.ErrIdempotencyConflict) {
 		t.Fatalf("expected idempotency conflict, got %v", err)
 	}

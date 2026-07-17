@@ -29,6 +29,14 @@ Docker Compose 会同时启动伪高德服务。CI 依次校验格式、sqlc 生
 
 业务 API 默认监听 `:8080`；Prometheus 管理端默认仅监听 `127.0.0.1:9090`。容器环境通过内部网络暴露管理端口，不映射到公网。
 
+## Android P0 联调
+
+客户端唯一契约是 `api/openapi.yaml`，所有 P0 请求从 `/api/v1` 开始；旧 `/api/pois/*` 路径不受支持。Android 模拟器访问本机 Compose API 时使用 `http://10.0.2.2:8080`，真机通过 USB 联调时可先执行 `adb reverse tcp:8080 tcp:8080`，再使用 `http://127.0.0.1:8080`。真机或测试环境不得把开发用 HTTP 地址作为发布配置。
+
+游客闭环可直接验证附近、搜索、详情、路线和外部导航。若需要验证手机号登录和地点确认，**仅在本机测试环境**把 `backend/.env` 改为 `APP_ENV=test` 并设置一个六位 `TEST_SMS_CODE`，然后执行 `docker compose up -d --build api`。该验证码不会出现在 API 响应或日志中；`APP_ENV=production` 仍强制要求完整的阿里云短信配置，绝不能设置 `TEST_SMS_CODE`。
+
+建议的最小人工验收顺序：健康检查 `GET /health/ready` → `POST /api/v1/auth/sms/send` → 使用本机的 `TEST_SMS_CODE` 调用 `POST /api/v1/auth/sms/verify` → 游客地点查询取得平台 UUID → 带 Bearer 令牌和 `Idempotency-Key` 调用 `POST /api/v1/places/{id}/confirmations`。重复相同请求必须返回原确认记录；同一键但不同载荷必须返回 `409`；注销后该访问令牌的写入必须返回 `401`。
+
 ## 稳定性约束
 
 - GCJ-02 与 WGS84 必须显式标注，PostGIS geography 仅保存 WGS84。
