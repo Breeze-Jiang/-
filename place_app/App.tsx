@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { PermissionsAndroid, Platform, StatusBar } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import RootNavigator from './src/navigation/RootNavigator';
 import { useLocationPermissionStore } from './src/store/useLocationPermissionStore';
 import { useP0SessionStore } from './src/p0/session';
@@ -20,6 +21,7 @@ export default function App() {
     };
     void requestLocation();
   }, []);
+
   useEffect(() => {
     void useP0SessionStore.getState().bootstrap();
   }, []);
@@ -27,7 +29,7 @@ export default function App() {
   return (
     <>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-      <RootNavigator />
+      <SafeAreaProvider><RootNavigator /></SafeAreaProvider>
     </>
   );
 }

@@ -17,9 +17,9 @@ import ProfileScreenV2, { ModerationStatusScreen, NotificationsScreen, PrivacySc
 import { ContentUnavailableScreen, LocationPermissionScreen, NetworkErrorScreen } from '../app/screens/SystemStateScreens';
 import { CreateMarkerComposerScreen, CreatePostComposerScreen, PlanComposerScreen } from '../app/screens/ComposerScreens';
 import ChatComposerScreen from '../app/screens/ChatComposerScreen';
-import { AuthenticationScreen, LockedFeatureTab } from '../app/screens/AuthenticationScreen';
-import { usePresentationSessionStore } from '../store/usePresentationSessionStore';
+import { AuthenticationScreen, UnavailableFeatureTab } from '../app/screens/AuthenticationScreen';
 import { AppIcon, AppIconName } from '../ui/AppIcon';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const RootStack = createNativeStackNavigator();
 const Tabs = createBottomTabNavigator();
@@ -27,39 +27,39 @@ const Tabs = createBottomTabNavigator();
 const tabLabels: Record<string, string> = { MapTab: '地图', DiscoverTab: '发现', MessagesTab: '消息', FavoritesTab: '收藏', ProfileTab: '我的' };
 const tabIcons: Record<string, AppIconName> = { MapTab: 'map', DiscoverTab: 'discover', MessagesTab: 'message', FavoritesTab: 'favorite', ProfileTab: 'profile' };
 
-function withAuthentication(Component: React.ComponentType<any>, action: string) {
-  return function AuthenticatedScreen(props: any) {
-    const signedIn = usePresentationSessionStore((state) => state.isSignedIn);
-    useEffect(() => {
-      if (!signedIn) {
-        props.navigation.replace('LoginGate', { action, resumeRoute: props.route.name, resumeParams: props.route.params });
-      }
-    }, [action, props.navigation, props.route.name, props.route.params, signedIn]);
-    return signedIn ? <Component {...props} /> : <View style={{ flex: 1 }} />;
+function unavailableFeature(action: string) {
+  return function UnavailableScreen() {
+    return <UnavailableFeatureTab title="功能尚未接入" description={`${action}将随 P1–P3 的服务端能力、数据模型和审核边界一起上线；当前 P0 仅支持地点查询、路线和地点确认。`} />;
   };
 }
 
-const ProtectedCreatePost = withAuthentication(CreatePostComposerScreen, '发布旅行内容');
-const ProtectedMarkerList = withAuthentication(MarkerListScreen, '管理个人标注');
-const ProtectedCreateMarker = withAuthentication(CreateMarkerComposerScreen, '创建地点标注');
-const ProtectedMarkerDetail = withAuthentication(MarkerDetailScreen, '编辑个人标注');
-const ProtectedPlanEditor = withAuthentication(PlanComposerScreen, '创建旅行计划');
-const ProtectedPlanDetail = withAuthentication(PlanDetailScreen, '查看个人旅行计划');
-const ProtectedFolderDetail = withAuthentication(FolderDetailScreen, '查看收藏夹');
-const ProtectedCreateFolder = withAuthentication(CreateFolderScreen, '创建收藏夹');
-const ProtectedManageFavorites = withAuthentication(ManageFavoritesScreen, '管理收藏地点');
-const ProtectedFriends = withAuthentication(FriendsScreen, '管理好友');
-const ProtectedFriendRequest = withAuthentication(FriendRequestScreen, '添加好友');
-const ProtectedChat = withAuthentication(ChatComposerScreen, '使用聊天');
-const ProtectedGroupManagement = withAuthentication(GroupManagementScreen, '管理私密群聊');
-const ProtectedNotifications = withAuthentication(NotificationsScreen, '查看通知');
+const ProtectedCreatePost = unavailableFeature('发布旅行内容');
+const ProtectedMarkerList = unavailableFeature('管理个人标注');
+const ProtectedCreateMarker = unavailableFeature('创建地点标注');
+const ProtectedMarkerDetail = unavailableFeature('编辑个人标注');
+const ProtectedPlanEditor = unavailableFeature('创建旅行计划');
+const ProtectedPlanDetail = unavailableFeature('查看个人旅行计划');
+const ProtectedFolderDetail = unavailableFeature('查看收藏夹');
+const ProtectedCreateFolder = unavailableFeature('创建收藏夹');
+const ProtectedManageFavorites = unavailableFeature('管理收藏地点');
+const ProtectedFriends = unavailableFeature('管理好友');
+const ProtectedFriendRequest = unavailableFeature('添加好友');
+const ProtectedChat = unavailableFeature('使用聊天');
+const ProtectedGroupManagement = unavailableFeature('管理私密群聊');
+const ProtectedNotifications = unavailableFeature('查看通知');
 
 function TabIcon({ routeName, color, focused }: { routeName: string; color: string; focused: boolean }) {
   return <AppIcon name={tabIcons[routeName]} color={color} size={22} strokeWidth={focused ? 2.3 : 1.8} label={tabLabels[routeName]} />;
 }
 
 function MainTabs() {
-  return <Tabs.Navigator screenOptions={({ route }) => ({ headerShown: false, tabBarActiveTintColor: COLORS.primary, tabBarInactiveTintColor: COLORS.textTertiary, tabBarStyle: { height: 64, paddingTop: 5, paddingBottom: 7, backgroundColor: COLORS.white, borderTopColor: COLORS.border }, tabBarLabelStyle: { fontSize: 11, fontWeight: '600' }, tabBarIcon: ({ color, focused }) => <TabIcon routeName={route.name} color={color} focused={focused} /> })}>
+  const insets = useSafeAreaInsets();
+  // A small optical inset sits above the icons; the physical inset below them
+  // is calculated from the device. This mirrors mature mobile apps: controls
+  // never crowd either the content or the Android gesture area.
+  const tabBarBottomInset = Math.max(insets.bottom, 8);
+  const tabBarHeight = 60 + tabBarBottomInset;
+  return <Tabs.Navigator screenOptions={({ route }) => ({ headerShown: false, tabBarActiveTintColor: COLORS.primary, tabBarInactiveTintColor: COLORS.textTertiary, tabBarStyle: { height: tabBarHeight, paddingTop: 7, paddingBottom: tabBarBottomInset, backgroundColor: COLORS.white, borderTopColor: COLORS.border }, tabBarLabelStyle: { fontSize: 11, fontWeight: '600', marginTop: 1 }, tabBarIcon: ({ color, focused }) => <TabIcon routeName={route.name} color={color} focused={focused} /> })}>
     <Tabs.Screen name="MapTab" component={MapHomeScreen} options={{ tabBarLabel: '地图' }} />
     <Tabs.Screen name="DiscoverTab" component={DiscoverScreen} options={{ tabBarLabel: '发现' }} />
     <Tabs.Screen name="MessagesTab" component={MessagesTab} options={{ tabBarLabel: '消息' }} />
@@ -68,14 +68,12 @@ function MainTabs() {
   </Tabs.Navigator>;
 }
 
-function MessagesTab({ navigation }: any) {
-  const signedIn = usePresentationSessionStore((state) => state.isSignedIn);
-  return signedIn ? <MessagesScreen navigation={navigation} /> : <LockedFeatureTab navigation={navigation} title="登录后查看消息" description="好友、群聊、地点定向分享和实时位置共享都需要先登录。" action="查看旅行消息" />;
+function MessagesTab() {
+  return <UnavailableFeatureTab title="消息功能尚未接入" description="好友、群聊、地点定向分享和实时位置共享将在后续服务端阶段接入；P0 登录不会解锁本地演示内容。" />;
 }
 
-function FavoritesTab({ navigation }: any) {
-  const signedIn = usePresentationSessionStore((state) => state.isSignedIn);
-  return signedIn ? <FavoritesScreenV2 navigation={navigation} /> : <LockedFeatureTab navigation={navigation} title="登录后管理收藏" description="收藏地点、建立自定义收藏夹和保存旅行计划需要登录。" action="管理旅行收藏" />;
+function FavoritesTab() {
+  return <UnavailableFeatureTab title="收藏功能尚未接入" description="收藏、标注和旅行计划将在后续服务端阶段接入；P0 登录不会创建或展示任何本地演示资产。" />;
 }
 
 function tabRedirect(target: string) {
