@@ -193,6 +193,7 @@ jobs:
 
   mobile-contract:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     defaults:
       run:
         working-directory: place_app
@@ -213,5 +214,8 @@ jobs:
         run: npm test
       - name: Build Android debug APK
         run: |
+          # Keep the China mirror for local Windows development, but GitHub's
+          # Linux runners use the official distribution endpoint.
+          sed -i 's|https://mirrors.aliyun.com/macports/distfiles/gradle/gradle-8.12-bin.zip|https://services.gradle.org/distributions/gradle-8.12-bin.zip|' android/gradle/wrapper/gradle-wrapper.properties
           chmod +x android/gradlew
-          ./android/gradlew :app:assembleDebug
+          ./android/gradlew :app:assembleDebug -PreactNativeArchitectures=x86_64 --no-daemon
