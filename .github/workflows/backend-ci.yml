@@ -219,4 +219,7 @@ jobs:
           # Linux runners use the official distribution endpoint.
           sed -i 's|https://mirrors.aliyun.com/macports/distfiles/gradle/gradle-8.12-bin.zip|https://services.gradle.org/distributions/gradle-8.12-bin.zip|' gradle/wrapper/gradle-wrapper.properties
           chmod +x gradlew
+          if [ ! -f app/debug.keystore ]; then
+            keytool -genkeypair -keystore app/debug.keystore -storepass android -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US" -noprompt
+          fi
           ./gradlew :app:assembleDebug -PreactNativeArchitectures=x86_64 --no-daemon
