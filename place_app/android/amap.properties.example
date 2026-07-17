@@ -1,0 +1,3 @@
+# Copy to amap.properties (ignored by Git) and use an Android-restricted key.
+# Restrict the key in the AMap console to this application ID and signing certificate.
+AMAP_KEY=

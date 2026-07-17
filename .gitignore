@@ -36,3 +36,11 @@ backend/.cache/
 
 # Local Windows binaries
 *.exe
+
+# Local React Native bundles and provider credentials
+**/.tmp/
+place_app/android/amap.properties
+place_app/android/local.properties
+**/debug.keystore
+**/hs_err_pid*.log
+**/replay_pid*.log
